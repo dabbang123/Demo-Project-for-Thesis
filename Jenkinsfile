@@ -11,11 +11,11 @@ pipeline {
     }
 
     stages {
-        stage('Clean Workspace') {
-            steps {
-                deleteDir()
-            }
-        }
+		stage('Clean Target Folder') {
+			steps {
+				sh 'rm -rf target || true'
+			}
+		}
 
         stage('Checkout Source') {
             steps {
