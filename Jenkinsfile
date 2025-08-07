@@ -11,11 +11,11 @@ pipeline {
     }
 
     stages {
-		stage('Clean Target Folder') {
-			steps {
-				sh 'rm -rf target || true'
-			}
-		}
+		//('Clean Target Folder') {
+		//	steps {
+		//		sh 'rm -rf target || true'
+		//	}
+		//}
 
         stage('Checkout Source') {
             steps {
