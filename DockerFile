@@ -27,5 +27,5 @@ FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=build /src/target/hello-world-jar-with-dependencies.jar /app/app.jar
 CMD ["java","-jar","/app/app.jar"]
-EOF
+
 
