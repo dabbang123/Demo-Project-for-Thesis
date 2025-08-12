@@ -1,14 +1,31 @@
 # Use OpenJDK base image
-FROM openjdk:17-jdk-slim
+#FROM openjdk:17-jdk-slim
 
 # Set working directory
-WORKDIR /app
+#WORKDIR /app
 
 # Copy the JAR file
-COPY target/*.jar app.jar
+#COPY target/*.jar app.jar
 
 # Expose port (if needed)
-EXPOSE 8080
+#EXPOSE 8080
 
 # Run the JAR
-ENTRYPOINT ["java", "-jar", "app.jar"]
+#ENTRYPOINT ["java", "-jar", "app.jar"]
+
+cat > Dockerfile << 'EOF'
+# Build stage
+FROM maven:3.9-eclipse-temurin-17 AS build
+WORKDIR /src
+COPY pom.xml .
+RUN mvn -q -DskipTests dependency:go-offline
+COPY src ./src
+RUN mvn -q -DskipTests package
+
+# Runtime stage (small JRE)
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=build /src/target/hello-world-jar-with-dependencies.jar /app/app.jar
+CMD ["java","-jar","/app/app.jar"]
+EOF
+
