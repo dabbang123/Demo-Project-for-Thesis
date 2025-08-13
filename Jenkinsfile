@@ -130,3 +130,4 @@ stage('Deploy Application') {
     always { echo 'Pipeline finished. Reports archived under build artifacts.' }
   }
 }
+}
