@@ -17,7 +17,7 @@ pipeline {
 
         stage('Build Application') {
             steps {
-                sh 'scripts/01_build_project.sh'
+                sh 'scripts/01_build.sh'
             }
         }
 
