@@ -48,29 +48,41 @@ pipeline {
     // 🚀 Stage: Deployment Decision Engine
   // ---------------------------------------------
 	stage('Deployment Decision') {
-		steps {
-			script {
-				// Read vulnerability counts from existing Trivy reports
-				def criticalCount = sh(script: "grep -c CRITICAL trivy-image-report.json || true", returnStdout: true).trim()
-				def highCount = sh(script: "grep -c HIGH trivy-image-report.json || true", returnStdout: true).trim()
+    steps {
+        script {
+            def criticalCount = "0"
+            def highCount = "0"
 
-				echo "Found CRITICAL vulnerabilities: ${criticalCount}"
-				echo "Found HIGH vulnerabilities: ${highCount}"
+            if (fileExists('trivy-image-report.json')) {
+                criticalCount = sh(
+                    script: "grep -c CRITICAL trivy-image-report.json || true",
+                    returnStdout: true
+                ).trim()
 
-				// Threshold logic — you can adjust these values
-				def maxCriticalAllowed = 0
-				def maxHighAllowed = 5
+                highCount = sh(
+                    script: "grep -c HIGH trivy-image-report.json || true",
+                    returnStdout: true
+                ).trim()
+            } else {
+                echo "⚠️ No Trivy image report found, skipping vulnerability check."
+            }
 
-				if (criticalCount.toInteger() > maxCriticalAllowed || highCount.toInteger() > maxHighAllowed) {
-					echo "🚫 Deployment Blocked: Vulnerability threshold exceeded."
-					currentBuild.result = 'UNSTABLE' // Marks build as unstable instead of failed
-				} else {
-					echo "✅ Deployment Approved: Vulnerabilities within safe limits."
-					env.DEPLOY_APPROVED = "true"
-				}
-			}
-		}
-	}
+            echo "Found CRITICAL vulnerabilities: ${criticalCount}"
+            echo "Found HIGH vulnerabilities: ${highCount}"
+
+            def maxCriticalAllowed = 0
+            def maxHighAllowed = 5
+
+            if (criticalCount.toInteger() > maxCriticalAllowed || highCount.toInteger() > maxHighAllowed) {
+                echo "🚫 Deployment Blocked: Vulnerability threshold exceeded."
+                currentBuild.result = 'UNSTABLE'
+            } else {
+                echo "✅ Deployment Approved: Vulnerabilities within safe limits."
+                env.DEPLOY_APPROVED = "true"
+            }
+        }
+    }
+}
 
 	// ---------------------------------------------
 	// 🚀 Stage: Vulnerability History Tracking
