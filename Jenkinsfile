@@ -40,15 +40,19 @@ pipeline {
         }
 
         stage('Publish Reports') {
-            steps {
-                sh 'scripts/05_publish_reports.sh'
-                publishHTML([
-                    reportDir: "${REPORTS_DIR}",
-                    reportFiles: 'index.html',
-                    reportName: 'Security Reports'
-                ])
-            }
-        }
+  steps {
+    sh 'scripts/05_publish_reports.sh'
+    publishHTML(target: [
+      reportDir: "reports",
+      reportFiles: "index.html",
+      reportName: "Security Reports",
+      keepAll: true,
+      alwaysLinkToLastBuild: true,
+      allowMissing: true
+    ])
+  }
+}
+
 
         // ---------------------------------------------
         // Deployment Decision Engine
