@@ -17,31 +17,31 @@ pipeline {
 
         stage('Build Application') {
             steps {
-                sh 'scripts/01_build.sh'
+                sh 'bash scripts/01_build.sh'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh 'scripts/02_build_image.sh'
+                sh 'bash scripts/02_build_image.sh'
             }
         }
 
         stage('Trivy FS Scan') {
             steps {
-                sh 'scripts/03_trivy_fs_scan.sh'
+                sh 'bash scripts/03_trivy_fs_scan.sh'
             }
         }
 
         stage('Trivy Image Scan') {
             steps {
-                sh 'scripts/04_trivy_image_scan.sh'
+                sh 'bash scripts/04_trivy_image_scan.sh'
             }
         }
 
         stage('Publish Reports') {
   steps {
-    sh 'scripts/05_publish_reports.sh'
+    sh 'bash scripts/05_publish_reports.sh'
     publishHTML(target: [
       reportDir: "reports",
       reportFiles: "index.html",
