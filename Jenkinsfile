@@ -120,19 +120,14 @@ pipeline {
         // Deploy Application (local test run)
         // ---------------------------------------------
         stage('Deploy Application') {
-            when { expression { env.DEPLOY_APPROVED == "true" } }
-            steps {
-                script {
-                    echo "🚀 Deploying latest image..."
-                    sh '''
-                        FULL_TAG=$(cat image_tag.txt)
-                        docker stop myapp || true
-                        docker rm myapp || true
-                        docker run -d --name myapp -p 8080:8080 "$FULL_TAG"
-                    '''
-                }
-            }
+    steps {
+        script {
+            echo "🚀 Deploying latest image..."
+            sh 'bash scripts/06_deploy.sh'
         }
+    }
+}
+
 
         // ---------------------------------------------
         // Optional: Push to Docker Hub
