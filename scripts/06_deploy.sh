@@ -22,4 +22,7 @@ docker rm myapp >/dev/null 2>&1 || true
 # Run container on the selected port
 docker run -d --name myapp -p ${HOST_PORT}:8080 "${FULL_TAG}"
 
-echo "✅ Deployment successful! Access the app at: http://<vm-ip>:${HOST_PORT}"
+# Detect VM IP automatically
+VM_IP=$(hostname -I | awk '{print $1}')
+
+echo "✅ Deployment successful! Access the app at: http://${VM_IP}:${HOST_PORT}"
