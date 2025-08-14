@@ -1,144 +1,159 @@
 pipeline {
-  agent any
-
-  environment {
-    IMAGE_NAME = 'local/demo-thesis'     // change if you want
-    SKIP_TESTS = 'true'                  // flip to 'false' when ready
-  }
-
-  options {
-    timestamps()
-    buildDiscarder(logRotator(numToKeepStr: '30'))
-  }
-
-  stages {
-    stage('Checkout') {
-      steps { checkout scm }
+    agent any
+    environment {
+        // Adjust this if you have a different workspace subdir
+        REPORTS_DIR = "reports"
     }
+    stages {
 
-    stage('Build (Maven)') {
-      steps { sh 'scripts/01_build.sh' }
-    }
-
-    stage('Docker Build') {
-      steps { sh 'scripts/02_build_image.sh' }
-    }
-
-    stage('Trivy FS Scan') {
-      steps { sh 'scripts/03_trivy_fs_scan.sh' }
-    }
-
-    stage('Trivy Image Scan') {
-      steps { sh 'scripts/04_trivy_image_scan.sh' }
-    }
-
-    stage('Publish Reports') {
-      steps {
-        sh 'scripts/05_publish_reports.sh'
-        archiveArtifacts artifacts: 'reports/**', fingerprint: true
-        publishHTML(target: [
-          reportDir: 'reports/html',
-          reportFiles: 'trivy-fs.txt,trivy-image.txt',
-          reportName: 'Security Reports',
-          keepAll: true, alwaysLinkToLastBuild: true, allowMissing: true
-        ])
-      }
-    }
-    // ---------------------------------------------
-    // 🚀 Stage: Deployment Decision Engine
-  // ---------------------------------------------
-	stage('Deployment Decision') {
-    steps {
-        script {
-            def criticalCount = "0"
-            def highCount = "0"
-
-            if (fileExists('trivy-image-report.json')) {
-                criticalCount = sh(
-                    script: "grep -c CRITICAL trivy-image-report.json || true",
-                    returnStdout: true
-                ).trim()
-
-                highCount = sh(
-                    script: "grep -c HIGH trivy-image-report.json || true",
-                    returnStdout: true
-                ).trim()
-            } else {
-                echo "⚠️ No Trivy image report found, skipping vulnerability check."
-            }
-
-            echo "Found CRITICAL vulnerabilities: ${criticalCount}"
-            echo "Found HIGH vulnerabilities: ${highCount}"
-
-            def maxCriticalAllowed = 0
-            def maxHighAllowed = 5
-
-            if (criticalCount.toInteger() > maxCriticalAllowed || highCount.toInteger() > maxHighAllowed) {
-                echo "🚫 Deployment Blocked: Vulnerability threshold exceeded."
-                currentBuild.result = 'UNSTABLE'
-            } else {
-                echo "✅ Deployment Approved: Vulnerabilities within safe limits."
-                env.DEPLOY_APPROVED = "true"
+        // ---------------------------------------------
+        // Build & Scan Stages (existing implementation)
+        // ---------------------------------------------
+        stage('Checkout') {
+            steps {
+                checkout scm
             }
         }
-    }
-}
 
-	// ---------------------------------------------
-	// 🚀 Stage: Vulnerability History Tracking
-	// ---------------------------------------------
-	stage('Record Vulnerability History') {
-		steps {
-			script {
-				// Ensure history file exists
-				sh 'touch vuln_history.csv'
-            
-				// Append date and vulnerability counts
-				sh '''
-					CRIT=$(grep -c CRITICAL trivy-image-report.json || true)
-					HIGH=$(grep -c HIGH trivy-image-report.json || true)
-					echo "$(date +%Y-%m-%d),$CRIT,$HIGH" >> vuln_history.csv
-				'''
-            
-				echo "📊 Vulnerability counts added to history log."
-			}
-		}
-	}
-
-	// ---------------------------------------------
-	// 🚀 Stage: Conditional Deployment
-	// ---------------------------------------------
-	stage('Deploy Application') {
-		when {
-			expression { env.DEPLOY_APPROVED == "true" }
-		}
-		steps {
-			script {
-				echo "🚀 Deploying latest image..."
-				sh """
-					docker stop myapp || true
-					docker rm myapp || true
-					docker run -d --name myapp -p 8080:8080 $DOCKER_USER/myapp:latest
-				"""
-			}
-		}
-	}
-    // Optional: push image later
-    stage('Push Image') {
-      when { expression { return false } } // set to true when you add creds
-      steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-          sh '''
-            FULL_TAG=$(cat image_tag.txt)
-            echo "$PASS" | docker login -u "$USER" --password-stdin
-            docker push "$FULL_TAG"
-          '''
+        stage('Build Application') {
+            steps {
+                sh 'scripts/01_build_project.sh'
+            }
         }
-      }
-    }
-  }
 
-  post {
-    always { echo 'Pipeline finished. Reports archived under build artifacts.' }
-  }
+        stage('Build Docker Image') {
+            steps {
+                sh 'scripts/02_build_image.sh'
+            }
+        }
+
+        stage('Trivy FS Scan') {
+            steps {
+                sh 'scripts/03_trivy_fs_scan.sh'
+            }
+        }
+
+        stage('Trivy Image Scan') {
+            steps {
+                sh 'scripts/04_trivy_image_scan.sh'
+            }
+        }
+
+        stage('Publish Reports') {
+            steps {
+                sh 'scripts/05_publish_reports.sh'
+                publishHTML([
+                    reportDir: "${REPORTS_DIR}",
+                    reportFiles: 'index.html',
+                    reportName: 'Security Reports'
+                ])
+            }
+        }
+
+        // ---------------------------------------------
+        // Deployment Decision Engine
+        // ---------------------------------------------
+        stage('Deployment Decision') {
+            steps {
+                script {
+                    env.DEPLOY_APPROVED = "false"
+                    def reportPath = "${REPORTS_DIR}/trivy-image.json"
+                    def criticalCount = "0"
+                    def highCount     = "0"
+
+                    if (fileExists(reportPath)) {
+                        criticalCount = sh(
+                            script: "grep -c CRITICAL ${reportPath} || true",
+                            returnStdout: true
+                        ).trim()
+                        highCount = sh(
+                            script: "grep -c HIGH ${reportPath} || true",
+                            returnStdout: true
+                        ).trim()
+                    } else {
+                        echo "⚠️ ${reportPath} not found. Treating vulnerability counts as 0."
+                    }
+
+                    echo "Found CRITICAL vulnerabilities: ${criticalCount}"
+                    echo "Found HIGH vulnerabilities: ${highCount}"
+
+                    def maxCriticalAllowed = 0
+                    def maxHighAllowed     = 5
+
+                    if (criticalCount.toInteger() > maxCriticalAllowed ||
+                        highCount.toInteger() > maxHighAllowed) {
+                        echo "🚫 Deployment Blocked: Vulnerability threshold exceeded."
+                        currentBuild.result = 'UNSTABLE'
+                    } else {
+                        echo "✅ Deployment Approved: Vulnerabilities within safe limits."
+                        env.DEPLOY_APPROVED = "true"
+                    }
+                }
+            }
+        }
+
+        // ---------------------------------------------
+        // Vulnerability History Tracking
+        // ---------------------------------------------
+        stage('Record Vulnerability History') {
+            steps {
+                script {
+                    def reportPath = "${REPORTS_DIR}/trivy-image.json"
+                    sh 'touch vuln_history.csv'
+                    sh """
+                        CRIT=\$(grep -c CRITICAL ${reportPath} 2>/dev/null || true)
+                        HIGH=\$(grep -c HIGH ${reportPath} 2>/dev/null || true)
+                        CRIT=\${CRIT:-0}
+                        HIGH=\${HIGH:-0}
+                        echo "\$(date +%Y-%m-%d),\$CRIT,\$HIGH" >> vuln_history.csv
+                    """
+                    echo "📊 Vulnerability counts added to history log."
+                }
+            }
+        }
+
+        // ---------------------------------------------
+        // Deploy Application (local test run)
+        // ---------------------------------------------
+        stage('Deploy Application') {
+            when { expression { env.DEPLOY_APPROVED == "true" } }
+            steps {
+                script {
+                    echo "🚀 Deploying latest image..."
+                    sh '''
+                        FULL_TAG=$(cat image_tag.txt)
+                        docker stop myapp || true
+                        docker rm myapp || true
+                        docker run -d --name myapp -p 8080:8080 "$FULL_TAG"
+                    '''
+                }
+            }
+        }
+
+        // ---------------------------------------------
+        // Optional: Push to Docker Hub
+        // ---------------------------------------------
+        // stage('Push Image') {
+        //     when { expression { env.DEPLOY_APPROVED == "true" } }
+        //     steps {
+        //         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+        //             sh '''
+        //                 FULL_TAG=$(cat image_tag.txt)
+        //                 echo "$PASS" | docker login -u "$USER" --password-stdin
+        //                 docker tag "$FULL_TAG" "$USER/myapp:latest"
+        //                 docker push "$USER/myapp:latest"
+        //             '''
+        //         }
+        //     }
+        // }
+
+    }
+
+    post {
+        always {
+            echo "Pipeline finished. Reports archived under build artifacts."
+            archiveArtifacts artifacts: "${REPORTS_DIR}/**", fingerprint: true
+            archiveArtifacts artifacts: 'vuln_history.csv', fingerprint: true
+        }
+    }
 }
