@@ -54,9 +54,6 @@ pipeline {
 }
 
 
-        // ---------------------------------------------
-        // Deployment Decision Engine
-        // ---------------------------------------------
         stage('Deployment Decision') {
             steps {
                 script {
@@ -75,7 +72,7 @@ pipeline {
                             returnStdout: true
                         ).trim()
                     } else {
-                        echo "⚠️ ${reportPath} not found. Treating vulnerability counts as 0."
+                        echo " ${reportPath} not found. Treating vulnerability counts as 0."
                     }
 
                     echo "Found CRITICAL vulnerabilities: ${criticalCount}"
@@ -86,19 +83,16 @@ pipeline {
 
                     if (criticalCount.toInteger() > maxCriticalAllowed ||
                         highCount.toInteger() > maxHighAllowed) {
-                        echo "🚫 Deployment Blocked: Vulnerability threshold exceeded."
+                        echo " Deployment Blocked: Vulnerability threshold exceeded."
                         currentBuild.result = 'UNSTABLE'
                     } else {
-                        echo "✅ Deployment Approved: Vulnerabilities within safe limits."
+                        echo " Deployment Approved: Vulnerabilities within safe limits."
                         env.DEPLOY_APPROVED = "true"
                     }
                 }
             }
         }
 
-        // ---------------------------------------------
-        // Vulnerability History Tracking
-        // ---------------------------------------------
         stage('Record Vulnerability History') {
             steps {
                 script {
@@ -111,18 +105,15 @@ pipeline {
                         HIGH=\${HIGH:-0}
                         echo "\$(date +%Y-%m-%d),\$CRIT,\$HIGH" >> vuln_history.csv
                     """
-                    echo "📊 Vulnerability counts added to history log."
+                    echo " Vulnerability counts added to history log."
                 }
             }
         }
 
-        // ---------------------------------------------
-        // Deploy Application (local test run)
-        // ---------------------------------------------
         stage('Deploy Application') {
     steps {
         script {
-            echo "🚀 Deploying latest image..."
+            echo " Deploying latest image..."
             sh 'bash scripts/06_deploy.sh'
         }
     }
