@@ -15,7 +15,7 @@ set -euo pipefail
 echo "[04] Trivy image scan"
 
 if [[ ! -f image_tag.txt ]]; then
-  echo "❌ ERROR: image_tag.txt not found!"
+  echo " ERROR: image_tag.txt not found!"
   exit 1
 fi
 
